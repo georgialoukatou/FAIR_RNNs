@@ -32,24 +32,24 @@ for batchsize in  1 2 3 ;
                                 do
                                 for weight_dropout_in in "${weight_dropout_in_range[@]}"
                                         do
-                                        echo "$weight_dropout_in"
-                            #            for weight_dropout_hidden in "${weight_dropout_hidden_range[@]}"
-                             #                   do
-                              #                  for char_dropout_prob in "${char_dropout_prob_range[@]}"
-                               #                         do
-                                #                        for char_noise_prob in 0.0 0.01 0.02 0.05;
-                                 #                               do
-                                  #                              for learning_rate in 0.05 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8;
-                                   #                                     do
-                                    #                                    for sequence_length in 30 40 50 80;
-                                     #                                           do
-#       python lm-acqdiv.py --language $language --batchSize $batchsize --char_embedding_size $char_embedding_size --hidden_dim $hidden_dim --layer_num $layer_num --weight_dropout_in $weight_dropout_in --weight_dropout_hidden $weight_dropout_hidden --char_dropout_prob $char_dropout_prob --char_noise_prob $char_noise_prob --learning_rate $learning_rate --sequence_length $sequence_length  --save-to acqdiv-indonesian-initial
-                                          #                                      done
-                                         #                               done
-                                        #                        done
-                                       #                 done
-                                      #          done
-                                     #  done
+                                        #echo "$weight_dropout_in"
+                                        for weight_dropout_hidden in "${weight_dropout_hidden_range[@]}"
+                                                do
+                                                for char_dropout_prob in "${char_dropout_prob_range[@]}"
+                                                         do
+                                                         for char_noise_prob in 0.0 0.01 0.02 0.05;
+                                                                do
+                                                                for learning_rate in 0.05 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8;
+                                                                        do
+                                                                        for sequence_length in 30 40 50 80;
+                                                                                do
+       python lm-acqdiv.py --language $language --batchSize $batchsize --char_embedding_size $char_embedding_size --hidden_dim $hidden_dim --layer_num $layer_num --weight_dropout_in $weight_dropout_in --weight_dropout_hidden $weight_dropout_hidden --char_dropout_prob $char_dropout_prob --char_noise_prob $char_noise_prob --learning_rate $learning_rate --sequence_length $sequence_length  --save-to acqdiv-indonesian-initial
+                                                                                done
+                                                                        done
+                                                                done
+                                                        done
+                                                done
+                                       done
                                 done
                         done
                 done
