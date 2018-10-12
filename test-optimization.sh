@@ -44,7 +44,7 @@ for batchsize in  1 2 3 ;
                                                                         for sequence_length in 30 40 50 80;
                                                                                 do
        python lm-acqdiv.py --language $language --batchSize $batchsize --char_embedding_size $char_embedding_size --hidden_dim $hidden_dim --layer_num $layer_num --weight_dropout_in $weight_dropout_in --weight_dropout_hidden $weight_dropout_hidden --char_dropout_prob $char_dropout_prob --char_noise_prob $char_noise_prob --learning_rate $learning_rate --sequence_length $sequence_length  --save-to acqdiv-indonesian-initial
-                                                                                done
+                                                                                
                                                                         done
                                                                 done
                                                         done
