@@ -1,9 +1,11 @@
-from config import VOCAB_HOME,  CHECKPOINT_HOME
+# -*- coding: utf-8 -*-
+
+from config import VOCAB_HOME, CHECKPOINT_HOME
 
 import os
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("--language", dest="language", type=str)
+parser.add_argument("--language", dest="language", type=str, default="portuguese")
 parser.add_argument("--load-from", dest="load_from", type=str)
 parser.add_argument("--save-to", dest="save_to", type=str)
 parser.add_argument("--out-loss-filename", dest="out_loss_filename", type=str)
@@ -28,11 +30,10 @@ args=parser.parse_args()
 print(args)
 
 
-from acqdivReadersplit import AcqdivReader, AcqdivReaderPartition
+from acqdivReadersplit_New import AcqdivReader
 
-acqdivCorpusReadertrain = AcqdivReader("train", args.language)
-acqdivCorpusReaderdev = AcqdivReader("dev", args.language)
-acqdivCorpusReadertest = AcqdivReader("test", args.language)
+acqdivCorpusReader = AcqdivReader(args.language)
+
 
 
 def plus(it1, it2):
@@ -41,16 +42,34 @@ def plus(it1, it2):
    for x in it2:
       yield x
 
-itos=[]
-with open(VOCAB_HOME + args.language + '-char.txt', "r") as inFile:
-     for line in inFile:
-      line=line.strip()
-      itos.append(line)
-itos.append("\n")
-stoi = dict([(itos[i],i) for i in range(len(itos))])
+speakers = {}
+characters = {}
+count = 0
+for snippet in acqdivCorpusReader.train:
+ characters["NewSnippet"] = characters.get("NewSnippet", 0)+1
 
-print(itos)
+ for line in snippet:
+   count += 1
+   if count % 100 == 0:
+     print(count)
+   utterance = line[2].strip("\x15").strip()
+   speaker = line[1]
+#   print(speaker, list(utterance))
+   speakers[speaker] = speakers.get(speaker,0)+1
+   for character in utterance+"\n":
+      characters[character] = characters.get(character, 0)+1
+   
+children = {"maf", "ami", "pri"}
+print(characters)
+print(speakers)
+characters = sorted(list(characters.items()), key=lambda x:(-x[1], x[0]))
+print(characters)
+itos = [x[0] for x in characters]
+stoi = dict(zip(itos, range(len(itos))))
 print(stoi)
+
+itos=[]
+
 
 
 import random
@@ -69,7 +88,7 @@ rnn_parameter_names = [name for name, _ in rnn.named_parameters()]
 print(rnn_parameter_names)
 
 
-rnn_drop = WeightDrop(rnn, [(name, args.weight_dropout_in) for name, _ in rnn.named_parameters() if name.startswith("weight_ih_")] + [ (name, args.weight_dropout_hidden) for name, _ in rnn.named_parameters() if name.startswith("weight_hh_")])
+rnn_drop = rnn #WeightDrop(rnn, [(name, args.weight_dropout_in) for name, _ in rnn.named_parameters() if name.startswith("weight_ih_")] + [ (name, args.weight_dropout_hidden) for name, _ in rnn.named_parameters() if name.startswith("weight_hh_")])
 
 output = torch.nn.Linear(args.hidden_dim, len(itos)+3).cuda()
 
@@ -111,6 +130,23 @@ def prepareDatasetChunks(data, train=True):
    numeric = [0]
    count = 0
    print("Prepare chunks")
+
+for snippet in acqdivCorpusReader.train:
+ characters["NewSnippet"] = characters.get("NewSnippet", 0)+1
+
+ for line in snippet:
+   count += 1
+   if count % 100 == 0:
+     print(count)
+   utterance = line[2].strip("\x15").strip()
+   speaker = line[1]
+#   print(speaker, list(utterance))
+   speakers[speaker] = speakers.get(speaker,0)+1
+   for character in utterance+"\n":
+      characters[character] = characters.get(character, 0)+1
+ 
+
+
    for chunk in data:
       #       print(len(chunk))
       for char in chunk:
@@ -124,22 +160,6 @@ def prepareDatasetChunks(data, train=True):
             yield numeric
             numeric = [0]
 
-
-
-
-def prepareDataset(data, train=True):
-   numeric = [0]
-   count = 0
-   for char in data:
-      if char == ";":
-         continue
-      count += 1
-      #         if count % 100000 == 0:
-      #             print(count/len(data))
-      numeric.append((stoi[char]+3 if char in stoi else 2) if (not train) or random.random() > args.char_noise_prob else 2+random.randint(0, len(itos)))
-      if len(numeric) > args.sequence_length:
-         yield numeric
-         numeric = [0]
 
 
 def forward(numeric, train=True, printHere=False):

@@ -1,4 +1,6 @@
-from config import VOCAB_HOME,  CHECKPOINT_HOME
+# -*- coding: utf-8 -*-
+
+from config import VOCAB_HOME, CHECKPOINT_HOME
 
 import os
 import sys
