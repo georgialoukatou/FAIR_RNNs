@@ -13,15 +13,15 @@ parser.add_argument("--out-loss-filename", dest="out_loss_filename", type=str)
 
 import random
 
-parser.add_argument("--batchSize", type=int, default=16)
+parser.add_argument("--batchSize", type=int, default=random.choice([8,16,32]))
 parser.add_argument("--char_embedding_size", type=int, default=100)
-parser.add_argument("--hidden_dim", type=int, default=1024)
-parser.add_argument("--layer_num", type=int, default=1)
-parser.add_argument("--weight_dropout_in", type=float, default=0.01)
-parser.add_argument("--weight_dropout_hidden", type=float, default=0.1)
-parser.add_argument("--char_dropout_prob", type=float, default=0.33)
+parser.add_argument("--hidden_dim", type=int, default=random.choice([256,512,1024]))
+parser.add_argument("--layer_num", type=int, default=random.choice([1,2]))
+parser.add_argument("--weight_dropout_in", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2]))
+parser.add_argument("--weight_dropout_out", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2]))
+parser.add_argument("--char_dropout_prob", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2]))
 parser.add_argument("--char_noise_prob", type = float, default= 0.0)
-parser.add_argument("--learning_rate", type = float, default= 0.1)
+parser.add_argument("--learning_rate", type = float, default=random.choice([0.1, 0.2, 0.5]))
 parser.add_argument("--myID", type=int, default=random.randint(0,1000000000))
 parser.add_argument("--sequence_length", type=int, default=50)
 
@@ -67,8 +67,6 @@ print(characters)
 itos = [x[0] for x in characters]
 stoi = dict(zip(itos, range(len(itos))))
 print(stoi)
-
-itos=[]
 
 
 
@@ -127,38 +125,29 @@ from torch.autograd import Variable
 
 
 def prepareDatasetChunks(data, train=True):
-   numeric = [0]
+   numeric = []
    count = 0
    print("Prepare chunks")
 
-for snippet in acqdivCorpusReader.train:
- characters["NewSnippet"] = characters.get("NewSnippet", 0)+1
-
- for line in snippet:
-   count += 1
-   if count % 100 == 0:
-     print(count)
-   utterance = line[2].strip("\x15").strip()
-   speaker = line[1]
-#   print(speaker, list(utterance))
-   speakers[speaker] = speakers.get(speaker,0)+1
-   for character in utterance+"\n":
-      characters[character] = characters.get(character, 0)+1
- 
-
-
-   for chunk in data:
-      #       print(len(chunk))
-      for char in chunk:
-         if char == ";":
+   for snippet in data:
+    numeric.append(stoi["NewSnippet"]+3)
+    for line in snippet:
+      utterance = line[2].strip("\x15").strip()
+      speaker = line[1]
+      if speaker in children:
+          continue
+      for character in utterance+"\n":
+         if character == " ":
             continue
-         count += 1
-         #         if count % 100000 == 0:
-         #             print(count/len(data))
-         numeric.append((stoi[char]+3 if char in stoi else 2) if (not train) or random.random() > args.char_noise_prob else 2+random.randint(0, len(itos)))
+         numeric.append(stoi[character]+3 if (not train) or random.random() > args.char_noise_prob else 2+random.randint(0, len(itos)))
          if len(numeric) > args.sequence_length:
-            yield numeric
-            numeric = [0]
+            yield numeric[:args.sequence_length+1]
+            numeric = numeric[args.sequence_length+1:]
+   
+
+
+bernoulli_input = torch.distributions.bernoulli.Bernoulli(torch.tensor([1-args.weight_dropout_in for _ in range(args.batchSize * args.char_embedding_size)]).cuda())
+bernoulli_output = torch.distributions.bernoulli.Bernoulli(torch.tensor([1-args.weight_dropout_out for _ in range(args.batchSize * args.hidden_dim)]).cuda())
 
 
 
@@ -171,12 +160,25 @@ def forward(numeric, train=True, printHere=False):
     #   embedded = embedded_dropout(char_embeddings, input_tensor, dropout=embedding_full_dropout_prob, scale=None) #char_embeddings(input_tensor)
     #else:
     embedded = char_embeddings(input_tensor)
+
     if train:
        embedded = char_dropout(embedded)
+       mask = bernoulli_input.sample()
+       mask = mask.view(1, args.batchSize, args.char_embedding_size)
+       embedded = embedded * mask
 
     out, _ = rnn_drop(embedded, None)
     #      if train:
     #          out = dropout(out)
+
+
+    if train:
+      mask = bernoulli_output.sample()
+      mask = mask.view(1, args.batchSize, args.hidden_dim)
+      out = out * mask
+
+
+
 
     logits = output(out)
     log_probs = logsoftmax(logits)
@@ -189,13 +191,7 @@ def forward(numeric, train=True, printHere=False):
     if printHere:
        lossTensor = print_loss(log_probs.view(-1, len(itos)+3), target_tensor.view(-1)).view(args.sequence_length, len(numeric))
        losses = lossTensor.data.cpu().numpy()
-       #         boundaries_index = [0 for _ in numeric]
        for i in range((args.sequence_length-1)-1):
-          #           if boundaries_index[0] < len(boundaries[0]) and i+1 == boundaries[0][boundaries_index[0]]:
-          #             boundary = True
-          #            boundaries_index[0] += 1
-          #        else:
-          #          boundary = False
           print((losses[i][0], itos[numeric[0][i+1]-3]))
     return loss, len(numeric) * args.sequence_length
 
@@ -212,9 +208,8 @@ import time
 devLosses = []
 for epoch in range(10000):
    print(epoch)
-   training_data = AcqdivReaderPartition(acqdivCorpusReadertrain).reshuffledIterator()
    print("Got data")
-   training_chars = prepareDatasetChunks(training_data, train=True)
+   training_chars = prepareDatasetChunks(acqdivCorpusReader.train, train=True)
 
    rnn_drop.train(True)
    startTime = time.time()
@@ -243,7 +238,7 @@ for epoch in range(10000):
    rnn_drop.train(False)
 
 
-   dev_data = AcqdivReaderPartition(acqdivCorpusReaderdev).iterator()
+   dev_data = acqdivCorpusReader.dev
    print("Got data")
    dev_chars = prepareDatasetChunks(dev_data, train=True)
 
@@ -264,7 +259,8 @@ for epoch in range(10000):
       dev_loss += numberOfCharacters * loss.cpu().data.numpy()
       dev_char_count += numberOfCharacters
    devLosses.append(dev_loss/dev_char_count)
-   with open(CHECKPOINT_HOME+args.language+"_"+os.path.basename(__file__)+"_"+str(args.myID), "w") as outFile:
+   with open("tuning_results/"+args.language+"_"+os.path.basename(__file__)+"_"+str(args.myID), "w") as outFile:
+      print(args, file=outFile)
       outFile.write(" ".join([str(x) for x in devLosses]) + '\n')
    if  len(devLosses)>1 and devLosses[-2] < devLosses [-1]:
       min_loss="minimum loss=" + str(float(devLosses[-2])) +" epoch=" + str(epoch-1) + " args=" + str(args)
