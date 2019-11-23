@@ -13,15 +13,15 @@ parser.add_argument("--out-loss-filename", dest="out_loss_filename", type=str)
 
 import random
 
-parser.add_argument("--batchSize", type=int, default=random.choice([8,16,32]))
+parser.add_argument("--batchSize", type=int, default=random.choice([4, 8,16,32,64])) # 1, 2, 4, 
 parser.add_argument("--char_embedding_size", type=int, default=100)
 parser.add_argument("--hidden_dim", type=int, default=random.choice([256,512,1024]))
 parser.add_argument("--layer_num", type=int, default=random.choice([1,2]))
-parser.add_argument("--weight_dropout_in", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2]))
-parser.add_argument("--weight_dropout_out", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2]))
-parser.add_argument("--char_dropout_prob", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2]))
-parser.add_argument("--char_noise_prob", type = float, default= 0.0)
-parser.add_argument("--learning_rate", type = float, default=random.choice([0.1, 0.2, 0.5]))
+parser.add_argument("--weight_dropout_in", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2, 0.3]))
+parser.add_argument("--weight_dropout_out", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2, 0.3]))
+parser.add_argument("--char_dropout_prob", type=float, default=random.choice([0.01, 0.05, 0.1, 0.2, 0.3]))
+parser.add_argument("--char_noise_prob", type = float, default=random.choice([0.0, 0.0, 0.0, 0.01]))
+parser.add_argument("--learning_rate", type = float, default=random.choice([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]))
 parser.add_argument("--myID", type=int, default=random.randint(0,1000000000))
 parser.add_argument("--sequence_length", type=int, default=50)
 
@@ -77,7 +77,7 @@ import torch
 
 print(torch.__version__)
 
-from weight_drop import WeightDrop
+#from weight_drop import WeightDrop
 
 
 rnn = torch.nn.LSTM(args.char_embedding_size, args.hidden_dim, args.layer_num).cuda()
@@ -199,14 +199,14 @@ def backward(loss, printHere):
    optim.zero_grad()
    if printHere:
       print(loss)
-      loss.backward()
-      torch.nn.utils.clip_grad_value_(parameters_cached, 5.0) #, norm_type="inf")
-      optim.step()
+   loss.backward()
+   torch.nn.utils.clip_grad_value_(parameters_cached, 5.0) #, norm_type="inf")
+   optim.step()
 
 import time
 
 devLosses = []
-for epoch in range(10000):
+for epoch in range(200):
    print(epoch)
    print("Got data")
    training_chars = prepareDatasetChunks(acqdivCorpusReader.train, train=True)
